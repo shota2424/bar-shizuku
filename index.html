@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BAR 雫 - 店舗管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #1a202c; color: #e2e8f0; font-family: sans-serif; }
+        .glass { background: rgba(45, 55, 72, 0.8); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.1); }
+        .tab-btn.active { color: #818cf8; border-bottom: 2px solid #818cf8; }
+        .toast { animation: slideUp 0.3s ease-out; }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- ヘッダー -->
+    <header class="glass p-4 sticky top-0 z-50 shadow-md">
+        <h1 class="text-xl font-bold flex items-center gap-2">
+            <i class="fa-solid fa-wine-glass-empty text-indigo-400"></i> BAR 雫 管理
+        </h1>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="flex-1 overflow-y-auto pb-20 p-4">
+
+        <!-- 在庫管理セクション -->
+        <div id="inventory-view" class="space-y-4">
+            <h2 class="text-lg font-bold border-b border-gray-700 pb-2">在庫・発注</h2>
+            <div id="inventory-list" class="space-y-3"></div>
+            <button onclick="generateOrder()" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 shadow-lg mt-6">
+                <i class="fa-brands fa-line text-xl"></i> LINE発注メッセージ作成
+            </button>
+        </div>
+
+        <!-- 出勤管理セクション -->
+        <div id="attendance-view" class="space-y-4 hidden">
+            <h2 class="text-lg font-bold border-b border-gray-700 pb-2">タイムカード</h2>
+            <div class="glass p-4 rounded-lg space-y-4">
+                <select id="staff-name" class="w-full bg-gray-800 border border-gray-600 rounded p-3 text-white">
+                    <option value="">スタッフ名を選択</option>
+                    <option value="店長">店長</option>
+                    <option value="スタッフA">スタッフA</option>
+                </select>
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="stamp('出勤')" class="bg-blue-600 py-4 rounded-lg font-bold flex flex-col items-center"><i class="fa-solid fa-right-to-bracket mb-1"></i>出勤</button>
+                    <button onclick="stamp('退勤')" class="bg-rose-600 py-4 rounded-lg font-bold flex flex-col items-center"><i class="fa-solid fa-right-from-bracket mb-1"></i>退勤</button>
+                </div>
+            </div>
+            <div class="mt-6">
+                <h3 class="text-sm text-gray-400 mb-2">本日の打刻</h3>
+                <ul id="stamp-log" class="space-y-2 text-sm"></ul>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- ボトムナビ -->
+    <nav class="glass fixed bottom-0 w-full flex">
+        <button onclick="switchTab('inventory')" id="tab-inventory" class="tab-btn active flex-1 py-4 flex flex-col items-center gap-1 text-gray-400">
+            <i class="fa-solid fa-box"></i><span class="text-xs">在庫管理</span>
+        </button>
+        <button onclick="switchTab('attendance')" id="tab-attendance" class="tab-btn flex-1 py-4 flex flex-col items-center gap-1 text-gray-400">
+            <i class="fa-regular fa-clock"></i><span class="text-xs">出勤管理</span>
+        </button>
+    </nav>
+
+    <!-- 発注モーダル -->
+    <div id="modal" class="fixed inset-0 bg-black/80 hidden items-center justify-center p-4 z-50">
+        <div class="glass p-5 rounded-lg w-full max-w-md">
+            <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-lg">発注メッセージ</h3>
+                <button onclick="closeModal()" class="text-gray-400 text-xl"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <textarea id="order-text" class="w-full h-48 bg-gray-900 border border-gray-700 rounded p-3 text-sm mb-3" readonly></textarea>
+            <button onclick="copyOrder()" class="w-full bg-indigo-600 py-3 rounded-lg font-bold">コピーして閉じる</button>
+        </div>
+    </div>
+
+    <script>
+        // --- データ（プロトタイプ用） ---
+        const inventory = [
+            { name: "山崎 NV", target: 3, current: 3 },
+            { name: "白州 NV", target: 3, current: 3 },
+            { name: "サウザ シルバー", target: 2, current: 2 },
+            { name: "炭酸水 (箱)", target: 3, current: 3 }
+        ];
+
+        // --- 在庫管理機能 ---
+        function renderInventory() {
+            const list = document.getElementById('inventory-list');
+            list.innerHTML = inventory.map((item, i) => `
+                <div class="glass p-4 rounded-lg flex justify-between items-center">
+                    <div>
+                        <div class="font-bold">${item.name}</div>
+                        <div class="text-xs text-gray-400">目安: ${item.target}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button onclick="changeStock(${i}, -1)" class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">-</button>
+                        <span class="w-6 text-center font-bold text-lg">${item.current}</span>
+                        <button onclick="changeStock(${i}, 1)" class="w-8 h-8 bg-gray-700 rounded-full flex items-center justify-center">+</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function changeStock(index, delta) {
+            inventory[index].current = Math.max(0, inventory[index].current + delta);
+            renderInventory();
+        }
+
+        function generateOrder() {
+            let msg = "お疲れ様です。BAR 雫です。\n以下の発注をお願いします。\n\n";
+            let hasOrder = false;
+
+            inventory.forEach(item => {
+                const diff = item.target - item.current;
+                if (diff > 0) {
+                    msg += `・${item.name}： ${diff}\n`;
+                    hasOrder = true;
+                }
+            });
+
+            if (!hasOrder) msg += "※本日の発注はありません。\n";
+            msg += "\nよろしくお願いいたします。";
+
+            document.getElementById('order-text').value = msg;
+            document.getElementById('modal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('modal').style.display = 'none'; }
+        function copyOrder() {
+            const text = document.getElementById('order-text');
+            text.select();
+            document.execCommand('copy');
+            closeModal();
+            alert('コピーしました！LINEに貼り付けてください。');
+        }
+
+        // --- 出勤管理機能 ---
+        function stamp(type) {
+            const name = document.getElementById('staff-name').value;
+            if (!name) return alert('スタッフ名を選択してください');
+
+            const time = new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+            const logArea = document.getElementById('stamp-log');
+            const color = type === '出勤' ? 'text-blue-400' : 'text-rose-400';
+
+            logArea.innerHTML = `
+                <li class="glass p-3 rounded flex justify-between">
+                    <span><span class="${color} font-bold">[${type}]</span> ${name}</span>
+                    <span class="font-mono">${time}</span>
+                </li>
+            ` + logArea.innerHTML;
+        }
+
+        // --- UI機能 ---
+        function switchTab(tab) {
+            document.getElementById('inventory-view').style.display = tab === 'inventory' ? 'block' : 'none';
+            document.getElementById('attendance-view').style.display = tab === 'attendance' ? 'block' : 'none';
+            document.getElementById('tab-inventory').classList.toggle('active', tab === 'inventory');
+            document.getElementById('tab-attendance').classList.toggle('active', tab === 'attendance');
+        }
+
+        // 初期表示
+        renderInventory();
+    </script>
+</body>
+</html>

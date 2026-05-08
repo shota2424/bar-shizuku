@@ -1,36 +1,102 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BAR雫 店舗管理システム
 
-## Getting Started
+スナック・バー「BAR雫」の店舗運営を一元管理するWebアプリです。
 
-First, run the development server:
+## 機能
+
+- **スタッフ管理** — 名前・時給・役職の登録と管理
+- **シフト管理** — 月間シフト表の作成・編集
+- **出勤管理** — 日次の出退勤時刻と手当の記録
+- **給与計算** — 勤務時間×時給の自動計算、ドリンクバック・指名料・手当の加算
+- **売上管理** — 日次売上（現金・カード・売掛）の入力と月次集計
+- **在庫管理** — ボトル・ドリンクの在庫数管理と発注アラート
+- **ダッシュボード** — 出勤状況・売上サマリー・在庫アラートの一覧
+
+## セットアップ
+
+### 1. リポジトリのクローンと依存パッケージのインストール
+
+```bash
+git clone <repository-url>
+cd bar-shizuku
+npm install
+```
+
+### 2. Clerk（認証）のセットアップ
+
+1. [Clerk](https://clerk.com) でアカウントを作成
+2. 新しいアプリケーションを作成
+3. ダッシュボードから **Publishable Key** と **Secret Key** をコピー
+
+### 3. データベース（Neon Postgres）のセットアップ
+
+1. [Neon](https://neon.tech) でアカウントを作成
+2. 新しいプロジェクトを作成
+3. ダッシュボードから **Connection string** をコピー（`postgresql://...` 形式）
+
+> Vercel にデプロイする場合は Vercel Marketplace から Neon を追加すると環境変数が自動で設定されます。
+
+### 4. 環境変数の設定
+
+`.env.local` を作成し、以下を設定します：
+
+```bash
+cp .env.example .env.local
+```
+
+`.env.local` を編集：
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/bar_shizuku"
+
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_xxxx
+CLERK_SECRET_KEY=sk_test_xxxx
+NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
+NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-in
+NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
+```
+
+### 5. データベースのセットアップ
+
+```bash
+# Prisma クライアントの生成
+npm run db:generate
+
+# スキーマをデータベースに反映
+npm run db:push
+```
+
+### 6. 開発サーバーの起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+[http://localhost:3000](http://localhost:3000) をブラウザで開きます。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## スクリプト
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| コマンド | 説明 |
+|---|---|
+| `npm run dev` | 開発サーバーを起動 |
+| `npm run build` | 本番ビルド |
+| `npm run db:generate` | Prisma クライアントを生成 |
+| `npm run db:push` | スキーマをDBに反映（開発用） |
+| `npm run db:migrate` | マイグレーションを作成・適用（本番用） |
+| `npm run db:studio` | Prisma Studio でDBを確認 |
 
-## Learn More
+## Vercel へのデプロイ
 
-To learn more about Next.js, take a look at the following resources:
+1. [Vercel](https://vercel.com) にリポジトリをインポート
+2. Vercel Marketplace から **Neon** を追加（`DATABASE_URL` が自動設定）
+3. 環境変数に Clerk のキーを追加
+4. デプロイ
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 技術スタック
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **フレームワーク**: Next.js 16 (App Router)
+- **スタイル**: Tailwind CSS v4 + shadcn/ui (Base UI)
+- **データベース**: PostgreSQL (Neon)
+- **ORM**: Prisma 6
+- **認証**: Clerk v7
+- **デプロイ**: Vercel

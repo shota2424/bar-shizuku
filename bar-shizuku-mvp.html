@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BAR 雫 在庫・発注管理</title>
+  
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            background: '#111827',
+            accent: '#6366F1',
+            card: '#1F2937',
+            'card-border': '#374151',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #111827;
+      color: #F9FAFB;
+      font-family: 'Inter', 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .tap-target {
+      min-width: 44px;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    input[type=number]::-webkit-inner-spin-button, 
+    input[type=number]::-webkit-outer-spin-button { 
+      -webkit-appearance: none; 
+      margin: 0; 
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const INITIAL_DATA = [
+      { id: '1', name: '山崎 NV', category: 'ウイスキー', target_qty: 3, current_qty: 1 },
+      { id: '2', name: '白州 NV', category: 'ウイスキー', target_qty: 3, current_qty: 3 },
+      { id: '3', name: '響 JH', category: 'ウイスキー', target_qty: 2, current_qty: 0 },
+      { id: '4', name: '角瓶', category: 'ウイスキー', target_qty: 5, current_qty: 2 },
+      { id: '5', name: 'サウザ シルバー', category: 'テキーラ', target_qty: 2, current_qty: 1 },
+      { id: '6', name: 'クエルボ エスペシャル', category: 'テキーラ', target_qty: 2, current_qty: 2 },
+      { id: '7', name: 'コカレロ', category: 'リキュール', target_qty: 2, current_qty: 0 },
+      { id: '8', name: 'イエガーマイスター', category: 'リキュール', target_qty: 2, current_qty: 1 },
+      { id: '9', name: '炭酸水（箱）', category: '割材', target_qty: 3, current_qty: 0 },
+    ];
+
+    function App() {
+      const [stocks, setStocks] = useState(() => {
+        const saved = localStorage.getItem('bar_shizuku_stocks');
+        if (saved) {
+          try {
+            return JSON.parse(saved);
+          } catch (e) {
+            return INITIAL_DATA;
+          }
+        }
+        return INITIAL_DATA;
+      });
+
+      const [orderMode, setOrderMode] = useState('simple'); // 'simple' or 'category'
+      const [showModal, setShowModal] = useState(false);
+      const [toastMsg, setToastMsg] = useState('');
+
+      useEffect(() => {
+        localStorage.setItem('bar_shizuku_stocks', JSON.stringify(stocks));
+      }, [stocks]);
+
+      const updateQty = (id, newQty) => {
+        const parsed = parseInt(newQty);
+        const qty = isNaN(parsed) ? 0 : Math.max(0, parsed);
+        setStocks(stocks.map(s => s.id === id ? { ...s, current_qty: qty } : s));
+      };
+
+      const increment = (id) => {
+        setStocks(stocks.map(s => s.id === id ? { ...s, current_qty: s.current_qty + 1 } : s));
+      };
+
+      const decrement = (id) => {
+        setStocks(stocks.map(s => s.id === id && s.current_qty > 0 ? { ...s, current_qty: s.current_qty - 1 } : s));
+      };
+
+      const categories = useMemo(() => {
+        const cats = {};
+        stocks.forEach(s => {
+          if (!cats[s.category]) cats[s.category] = [];
+          cats[s.category].push(s);
+        });
+        return cats;
+      }, [stocks]);
+
+      const orderList = useMemo(() => {
+        return stocks.filter(s => s.target_qty - s.current_qty > 0)
+                     .map(s => ({ ...s, order_qty: s.target_qty - s.current_qty }));
+      }, [stocks]);
+
+      const generateMessage = () => {
+        if (orderList.length === 0) {
+          return "本日の発注はありません";
+        }
+
+        let msg = "お疲れ様です。BAR 雫です。\n以下の発注をお願いいたします。\n\n";
+        
+        if (orderMode === 'simple') {
+          orderList.forEach(s => {
+            msg += `・${s.name}：${s.order_qty}本\n`;
+          });
+        } else {
+          const cats = {};
+          orderList.forEach(s => {
+            if (!cats[s.category]) cats[s.category] = [];
+            cats[s.category].push(s);
+          });
+          
+          Object.keys(cats).forEach(c => {
+            msg += `【${c}】\n`;
+            cats[c].forEach(s => {
+              msg += `・${s.name}：${s.order_qty}本\n`;
+            });
+            msg += "\n";
+          });
+        }
+        
+        msg += "\nよろしくお願いいたします。";
+        return msg;
+      };
+
+      const copyToClipboard = () => {
+        const msg = generateMessage();
+        navigator.clipboard.writeText(msg).then(() => {
+          setToastMsg('コピーしました');
+          setTimeout(() => setToastMsg(''), 2000);
+        });
+      };
+
+      const openLine = () => {
+        const msg = encodeURIComponent(generateMessage());
+        window.location.href = `line://msg/text/${msg}`;
+      };
+
+      return (
+        <div className="pb-24">
+          {/* Header */}
+          <header className="sticky top-0 z-10 bg-background/90 backdrop-blur border-b border-card-border p-4 flex justify-between items-center">
+            <h1 className="text-xl font-bold tracking-wider">BAR 雫</h1>
+            <div className="text-sm text-gray-400">{new Date().toLocaleDateString('ja-JP')}</div>
+          </header>
+
+          {/* Main Content */}
+          <main className="p-4 space-y-8">
+            {Object.keys(categories).map(cat => (
+              <section key={cat} className="space-y-3">
+                <h2 className="text-lg font-semibold text-accent border-l-4 border-accent pl-2">{cat}</h2>
+                <div className="grid gap-3">
+                  {categories[cat].map(item => {
+                    const orderNeeded = Math.max(0, item.target_qty - item.current_qty);
+                    return (
+                      <div key={item.id} className="bg-card border border-card-border rounded-xl p-4 flex justify-between items-center shadow-sm">
+                        <div className="flex-1 pr-2">
+                          <h3 className="font-bold text-[15px]">{item.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-gray-400">目安: {item.target_qty}</span>
+                            {orderNeeded > 0 ? (
+                              <span className="text-xs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                                要発注: {orderNeeded}
+                              </span>
+                            ) : (
+                              <span className="text-xs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                                充足
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center bg-[#111827] rounded-lg border border-card-border overflow-hidden shadow-inner">
+                          <button 
+                            className="tap-target w-11 bg-card hover:bg-gray-700 active:bg-gray-600 text-xl font-medium text-gray-300 transition-colors"
+                            onClick={() => decrement(item.id)}
+                          >−</button>
+                          <input 
+                            type="number" 
+                            className="w-12 h-11 bg-transparent text-center font-bold text-lg focus:outline-none"
+                            value={item.current_qty}
+                            onChange={(e) => updateQty(item.id, e.target.value)}
+                            onFocus={(e) => e.target.select()}
+                          />
+                          <button 
+                            className="tap-target w-11 bg-card hover:bg-gray-700 active:bg-gray-600 text-xl font-medium text-gray-300 transition-colors"
+                            onClick={() => increment(item.id)}
+                          >＋</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </section>
+            ))}
+          </main>
+
+          {/* Footer CTA */}
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/95 backdrop-blur border-t border-card-border">
+            <button 
+              onClick={() => setShowModal(true)}
+              className="w-full tap-target bg-accent hover:bg-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-accent/20 transition-all text-lg"
+            >
+              LINE 発注メッセージを作成
+            </button>
+          </div>
+
+          {/* Modal */}
+          {showModal && (
+            <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)}>
+              <div 
+                className="bg-card w-full rounded-t-2xl p-5 border-t border-card-border transform transition-transform"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="flex justify-between items-center mb-5">
+                  <h3 className="font-bold text-lg">発注メッセージ生成</h3>
+                  <button onClick={() => setShowModal(false)} className="tap-target bg-gray-800 rounded-full w-8 h-8 min-w-[32px] min-h-[32px] text-gray-400 hover:text-white">✕</button>
+                </div>
+                
+                <div className="flex bg-[#111827] rounded-lg p-1 mb-4">
+                  <button 
+                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${orderMode === 'simple' ? 'bg-card text-white shadow' : 'text-gray-400'}`}
+                    onClick={() => setOrderMode('simple')}
+                  >シンプル</button>
+                  <button 
+                    className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${orderMode === 'category' ? 'bg-card text-white shadow' : 'text-gray-400'}`}
+                    onClick={() => setOrderMode('category')}
+                  >カテゴリ別</button>
+                </div>
+
+                <div className="bg-[#111827] p-4 rounded-xl border border-card-border text-sm whitespace-pre-wrap h-[40vh] overflow-y-auto font-mono mb-5 leading-relaxed">
+                  {generateMessage()}
+                </div>
+
+                <div className="flex gap-3">
+                  <button 
+                    className="flex-1 tap-target bg-card border border-card-border hover:bg-gray-700 font-bold rounded-xl transition-colors"
+                    onClick={copyToClipboard}
+                  >
+                    コピー
+                  </button>
+                  <button 
+                    className="flex-1 tap-target bg-[#06C755] hover:bg-[#05b34c] text-white font-bold rounded-xl transition-colors flex items-center gap-2"
+                    onClick={openLine}
+                  >
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+                      <path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 3.978 8.948 9.542 9.61.378.082.887.251 1.015.578.117.297.076.76.036 1.056l-.328 2.008c-.097.58-.517 2.531 2.222 1.381 2.739-1.149 7.42-4.373 9.489-7.014 1.306-1.674 2.024-3.57 2.024-5.619zm-15.006 2.036h-2.181c-.347 0-.63-.284-.63-.631v-4.108c0-.348.283-.631.63-.631h2.181c.348 0 .631.283.631.631s-.283.631-.631.631h-1.55v.478h1.55c.348 0 .631.283.631.631s-.283.631-.631.631h-1.55v.476h1.55c.348 0 .631.283.631.631s-.283.631-.631.631zm3.896 0c0 .347-.283.631-.631.631h-2.181c-.347 0-.63-.284-.63-.631v-4.108c0-.348.283-.631.63-.631h2.181c.348 0 .631.283.631.631s-.283.631-.631.631h-1.55v.478h1.55c.348 0 .631.283.631.631s-.283.631-.631.631h-1.55v.476h1.55c.348 0 .631.283.631.631s-.283.631-.631.631zm4.767-3.477l-1.954 3.254c-.139.232-.387.377-.655.377h-.002c-.066 0-.133-.008-.198-.026-.339-.092-.563-.404-.563-.756v-3.48c0-.348.283-.631.63-.631s.631.283.631.631v2.102l1.954-3.253c.139-.232.387-.377.654-.377h.002c.066 0 .133.008.198.026.339.092.563.404.563.756v3.48c0 .347-.283.631-.631.631s-.631-.283-.631-.631v-2.102zm3.328 3.477c0 .347-.283.631-.631.631s-.631-.284-.631-.631v-4.108c0-.348.283-.631.631-.631s.631.283.631.631v4.108z"/>
+                    </svg>
+                    LINE起動
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Toast Notification */}
+          <div className={`fixed top-16 left-1/2 -translate-x-1/2 bg-accent text-white px-5 py-3 rounded-full shadow-lg shadow-accent/30 text-sm font-bold z-50 transition-all duration-300 transform ${toastMsg ? 'translate-y-0 opacity-100' : '-translate-y-8 opacity-0 pointer-events-none'}`}>
+            {toastMsg}
+          </div>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>

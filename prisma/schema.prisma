@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Staff {
+  id          String       @id @default(cuid())
+  name        String
+  role        StaffRole    @default(STAFF)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum StaffRole {
+  OWNER
+  STAFF
+}
+
+model Sale {
+  id         String   @id @default(cuid())
+  date       DateTime @db.Date @unique
+  cash       Int      @default(0)
+  card       Int      @default(0)
+  receivable Int      @default(0)
+  total      Int      @default(0)
+  guestCount Int      @default(0)
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([date])
+}
+
+model Inventory {
+  id             String   @id @default(cuid())
+  name           String
+  category       String   @default("")
+  quantity       Int      @default(0)
+  unit           String   @default("本")
+  alertThreshold Int      @default(3)
+  note           String   @default("")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Customer {
+  id         String    @id @default(cuid())
+  name       String
+  nameKana   String    @default("")
+  birthday   DateTime? @db.Date
+  phone      String    @default("")
+  memo       String    @default("")
+  visitCount Int       @default(0)
+  lastVisit  DateTime? @db.Date
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+
