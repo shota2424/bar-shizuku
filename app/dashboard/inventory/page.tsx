@@ -1,6 +1,8 @@
 import { InventoryView } from "./inventory-view"
 import { db } from "@/lib/db"
 
+export const dynamic = "force-dynamic";
+
 export default async function InventoryPage() {
   let items = await db.inventory.findMany({
     orderBy: [

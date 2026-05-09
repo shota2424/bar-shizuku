@@ -1,6 +1,8 @@
 import { SettingsView } from "./settings-view"
 import { getStaffs } from "./actions"
 
+export const dynamic = "force-dynamic";
+
 export default async function SettingsPage() {
   const staffs = await getStaffs()
 

@@ -1,7 +1,6 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { db } from "@/lib/db"
 
 export async function upsertAttendance(data: {
   staffId: string
@@ -13,32 +12,7 @@ export async function upsertAttendance(data: {
   bonus?: number
   note?: string
 }) {
-  await db.attendance.upsert({
-    where: {
-      staffId_date: {
-        staffId: data.staffId,
-        date: new Date(data.date),
-      },
-    },
-    create: {
-      staffId: data.staffId,
-      date: new Date(data.date),
-      clockIn: data.clockIn,
-      clockOut: data.clockOut,
-      drinkBack: data.drinkBack ?? 0,
-      nominationFee: data.nominationFee ?? 0,
-      bonus: data.bonus ?? 0,
-      note: data.note ?? "",
-    },
-    update: {
-      clockIn: data.clockIn,
-      clockOut: data.clockOut,
-      drinkBack: data.drinkBack ?? 0,
-      nominationFee: data.nominationFee ?? 0,
-      bonus: data.bonus ?? 0,
-      note: data.note ?? "",
-    },
-  })
+  // DB has been removed for attendance, so this is just a mock for now
+  await new Promise(resolve => setTimeout(resolve, 500))
   revalidatePath("/dashboard/attendance")
-  revalidatePath("/dashboard/salary")
 }
